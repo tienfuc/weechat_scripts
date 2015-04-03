@@ -148,12 +148,24 @@ def urlbuf_print_cb(data, buffer, date, tags, displayed, highlight, prefix, mess
         weechat.prnt(urlbuf_buffer, output + url)
 
         # if pastebin
-        pastebin_re = re.compile(r'pastebin.com/(\w*)', re.I)
-        match = pastebin_re.search(url)
-
-        if match:
+        pastebin_re = re.compile(r'pastebin.com/(\w+)', re.I)
+        pastebin_m = pastebin_re.search(url)
+        if pastebin_m:
             #weechat.prnt(urlbuf_buffer, match.group(1))
-            url = "pastebin.com/raw.php?i=%s" % match.group(1)
+            url = "pastebin.com/raw.php?i=%s" % pastebin_m.group(1)
+
+        # if imgur
+        #http://imgur.com/download/40m3bjJ
+        #http://imgur.com/40m3bjJ
+        imgur_re = re.compile(r'imgur.com/(?:gallery/|)(\w+)', re.I)
+        imgur_m = imgur_re.search(url)
+        if imgur_m:
+            url = "imgur.com/download/%s" % imgur_m.group(1)
+ 
+        # if youtube 
+        # TBD
+
+    
 
         # run the hooked command
         hook_command = weechat.config_get_plugin("hook_command")
