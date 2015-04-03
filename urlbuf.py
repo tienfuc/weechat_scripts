@@ -147,6 +147,14 @@ def urlbuf_print_cb(data, buffer, date, tags, displayed, highlight, prefix, mess
         # Output the formatted URL into the buffer
         weechat.prnt(urlbuf_buffer, output + url)
 
+        # if pastebin
+        pastebin_re = re.compile(r'pastebin.com/(\w*)', re.I)
+        match = pastebin_re.search(url)
+
+        if match:
+            #weechat.prnt(urlbuf_buffer, match.group(1))
+            url = "pastebin.com/raw.php?i=%s" % match.group(1)
+
         # run the hooked command
         hook_command = weechat.config_get_plugin("hook_command")
         folder = weechat.config_get_plugin("save_folder")
