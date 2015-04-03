@@ -54,7 +54,7 @@ ipAddr = r'%s(?:\.%s){3}' % (octet, octet)
 # Base domain regex off RFC 1034 and 1738
 label = r'[0-9a-z][-0-9a-z]*[0-9a-z]?'
 domain = r'%s(?:\.%s)*\.[a-z][-0-9a-z]*[a-z]?' % (label, label)
-urlRe = re.compile(r'(\w+://(?:%s|%s)(?::\d+)?(?:/[^\])>\s]*)?)' % (domain, ipAddr), re.I)
+urlRe = re.compile(r'(\w*(?:://)?(?:%s|%s)(?::\d+)?(?:/[^\])>\s]*)?)' % (domain, ipAddr), re.I)
 
 urlbuf_buffer = None
 
@@ -65,6 +65,7 @@ urlbuf_settings = {
     "display_nick"          : ("off", "display the nick of the user"),
     "skip_duplicates"       : ("on",  "skip the URL that is already in the urlbuf"),
     "skip_buffers"          : ("",    "a comma separated list of buffer numbers to skip"),
+    "target_channels"       : ("",    "a comma separated list of channels to skip"),
 }
 
 
@@ -104,7 +105,14 @@ def urlbuf_print_cb(data, buffer, date, tags, displayed, highlight, prefix, mess
     # Exit if the message came from a buffer that is on the skip list
     buffer_number = str(weechat.buffer_get_integer(buffer, "number"))
     skips = set(weechat.config_get_plugin("skip_buffers").split(","))
+
+    buffer_channel = str(weechat.buffer_get_string(buffer, "short_name"))
+    target_channels = set(weechat.config_get_plugin("target_channels").split(","))
+
     if buffer_number in skips:
+        return weechat.WEECHAT_RC_OK
+
+    if buffer_channel not in target_channels:
         return weechat.WEECHAT_RC_OK
 
     if weechat.config_get_plugin("display_active_buffer") == "off":
@@ -118,9 +126,12 @@ def urlbuf_print_cb(data, buffer, date, tags, displayed, highlight, prefix, mess
         if weechat.config_get_plugin("skip_duplicates") == "on":
             if is_url_listed(urlbuf_buffer, url):
                 continue
+    
+        date = ""
+        output += "%s%s %s " % (weechat.color("reset"), date, buffer_channel)
 
         if weechat.config_get_plugin("display_buffer_number") == "on":
-            output += "%s%-2d " % (weechat.color("reset"), weechat.buffer_get_integer(buffer, "number"))
+            output += "%-2d " % (weechat.buffer_get_integer(buffer, "number"))
 
         if weechat.config_get_plugin("display_nick") == "on":
             output += "%s " % (prefix)
