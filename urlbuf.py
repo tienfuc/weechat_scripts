@@ -48,6 +48,10 @@ except ImportError:
     import_ok = False
 
 import re
+import os
+import urllib
+from time import strftime
+from datetime import datetime
 
 octet = r'(?:2(?:[0-4]\d|5[0-5])|1\d\d|\d{1,2})'
 ipAddr = r'%s(?:\.%s){3}' % (octet, octet)
@@ -66,6 +70,8 @@ urlbuf_settings = {
     "skip_duplicates"       : ("on",  "skip the URL that is already in the urlbuf"),
     "skip_buffers"          : ("",    "a comma separated list of buffer numbers to skip"),
     "target_channels"       : ("",    "a comma separated list of channels to skip"),
+    "hook_command"          : ("/usr/bin/curl %s -o %s --create-dirs",   "a hook command for grabbed URLs, the first %s is URL, the second is output file"),
+    "save_folder"           : ("urls",  "folder to save the content of URLs"),
 }
 
 
@@ -106,7 +112,7 @@ def urlbuf_print_cb(data, buffer, date, tags, displayed, highlight, prefix, mess
     buffer_number = str(weechat.buffer_get_integer(buffer, "number"))
     skips = set(weechat.config_get_plugin("skip_buffers").split(","))
 
-    buffer_channel = str(weechat.buffer_get_string(buffer, "short_name"))
+    buffer_channel = str(weechat.buffer_get_string(buffer, "name"))
     target_channels = set(weechat.config_get_plugin("target_channels").split(","))
 
     if buffer_number in skips:
@@ -127,18 +133,33 @@ def urlbuf_print_cb(data, buffer, date, tags, displayed, highlight, prefix, mess
             if is_url_listed(urlbuf_buffer, url):
                 continue
     
-        date = ""
-        output += "%s%s %s " % (weechat.color("reset"), date, buffer_channel)
+        #date_str = datetime.fromtimestamp(int(date)).strftime('%Y-%m-%d %H:%M:%S')
+        # hash
+        hashstr = os.urandom(8).encode('hex')
+        output += "%s%s %s " % (weechat.color("reset"), hashstr, buffer_channel)
 
-        if weechat.config_get_plugin("display_buffer_number") == "on":
-            output += "%-2d " % (weechat.buffer_get_integer(buffer, "number"))
+        #if weechat.config_get_plugin("display_buffer_number") == "on":
+        #    output += "%-2d " % (weechat.buffer_get_integer(buffer, "number"))
 
-        if weechat.config_get_plugin("display_nick") == "on":
-            output += "%s " % (prefix)
+        #if weechat.config_get_plugin("display_nick") == "on":
+        #    output += "%s " % (prefix)
 
         # Output the formatted URL into the buffer
         weechat.prnt(urlbuf_buffer, output + url)
 
+        # run the hooked command
+        hook_command = weechat.config_get_plugin("hook_command")
+        folder = weechat.config_get_plugin("save_folder")
+        output_file = os.path.join(folder, buffer_channel, hashstr)
+        command = hook_command % (url, output_file)
+        #weechat.prnt(urlbuf_buffer, command)
+        weechat.hook_process(command, 60000, "urlbuf_hook_cb", "")
+
+    return weechat.WEECHAT_RC_OK
+
+
+def urlbuf_hook_cb(data, command, code, out, err):
+    """ A Dummy callback for hook command. """
     return weechat.WEECHAT_RC_OK
 
 
