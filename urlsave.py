@@ -114,13 +114,13 @@ def urlsave_print_cb(data, buffer, date, tags, displayed, highlight, prefix, mes
                 return weechat.WEECHAT_RC_OK
         else:
             return weechat.WEECHAT_RC_OK
+    
 
     # Exit if the message came from a buffer that is not on the include channels
-    no_skips = weechat.config_get_plugin("include_channels")
+    buffer_channel = str(weechat.buffer_get_string(buffer, "name"))
+    no_skips = weechat.config_get_plugin("no_skips")
     if no_skips != "on":
-        buffer_channel = str(weechat.buffer_get_string(buffer, "name"))
         include_channels = set(weechat.config_get_plugin("include_channels").split(","))
-
         if buffer_channel not in include_channels:
             return weechat.WEECHAT_RC_OK
 
