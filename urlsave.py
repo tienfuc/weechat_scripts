@@ -50,17 +50,17 @@ url_re = re.compile(r'(\w*(?:://)?(?:%s|%s)(?::\d+)?(?:/[^\])>\s]*)?)' % (domain
 urlsave_buffer = None
 
 urlsave_settings = {
-    "display_private"       : ("on",	"display URLs from private messages"),
-    "display_nick"          : ("off",	"display the nick of the user"),
-    "skip_duplicates"       : ("on",	"skip the URL that is already in the urlsave"),
-	"no_skips"				: ("on",	"display URLs from all buffers, override \'include_channels\'"),
-    "include_channels"      : ("",		"a comma separated list of channels to save URLs"),
+    "display_private"       : ("on",    "display URLs from private messages"),
+    "display_nick"          : ("off",   "display the nick of the user"),
+    "skip_duplicates"       : ("on",    "skip the URL that is already in the urlsave"),
+    "no_skips"              : ("on",    "display URLs from all buffers, override \'include_channels\'"),
+    "include_channels"      : ("",      "a comma separated list of channels to save URLs"),
     "hook_command"          : ("/usr/bin/curl %s -o %s --create-dirs",   "a hook command for grabbed URLs, the first %s is URL, the second is output file"),
-    "save_folder"           : ("urls",	"folder to save the content of URLs"),
-	"convert_youtube"		: ("on",	"if convert youtube URL"),
-	"convert_imgur"			: ("on",	"if convert imgur URL"),
-	"convert_pastebin"		: ("on",	"if convert pastebin URL"),
-}
+    "save_folder"           : ("urls",  "folder to save the content of URLs"),
+    "convert_youtube"       : ("on",    "if convert youtube URL"),
+    "convert_imgur"         : ("on",    "if convert imgur URL"),
+    "convert_pastebin"      : ("on",    "if convert pastebin URL"),
+    }
 
 def is_url_listed(buffer, url):
     """ Search for the URL from the buffer lines. """
@@ -77,6 +77,26 @@ def is_url_listed(buffer, url):
 
     return found
 
+def convert_url(url, option):
+    # if pastebin
+    if "convert_pastebin" in option:
+        pastebin_re = re.compile(r'pastebin.com/(\w+)', re.I)
+        pastebin_m = pastebin_re.search(url)
+        if pastebin_m:
+            #weechat.prnt(urlsave_buffer, match.group(1))
+            return "pastebin.com/raw.php?i=%s" % pastebin_m.group(1)
+
+    # if imgur
+    #http://imgur.com/download/40m3bjJ
+    #http://imgur.com/40m3bjJ
+    if "convert_imgur" in option:
+        imgur_re = re.compile(r'imgur.com/(?:gallery/|)(\w+)', re.I)
+        imgur_m = imgur_re.search(url)
+        if imgur_m:
+            return "imgur.com/download/%s" % imgur_m.group(1)
+
+    # if youtube 
+    # TBD
 
 def urlsave_print_cb(data, buffer, date, tags, displayed, highlight, prefix, message):
     """ Called when a message is printed. """
@@ -90,19 +110,19 @@ def urlsave_print_cb(data, buffer, date, tags, displayed, highlight, prefix, mes
     tagslist = tags.split(",")
     if not "notify_message" in tagslist:
         if weechat.config_get_plugin("display_private") == "on":
-           if not "notify_private" in tagslist:
-               return weechat.WEECHAT_RC_OK
+            if not "notify_private" in tagslist:
+                return weechat.WEECHAT_RC_OK
         else:
-           return weechat.WEECHAT_RC_OK
+            return weechat.WEECHAT_RC_OK
 
     # Exit if the message came from a buffer that is not on the include channels
     no_skips = weechat.config_get_plugin("include_channels")
-	if no_skips != "on":
-		buffer_channel = str(weechat.buffer_get_string(buffer, "name"))
-		include_channels = set(weechat.config_get_plugin("include_channels").split(","))
+    if no_skips != "on":
+        buffer_channel = str(weechat.buffer_get_string(buffer, "name"))
+        include_channels = set(weechat.config_get_plugin("include_channels").split(","))
 
-		if buffer_channel not in include_channels:
-			return weechat.WEECHAT_RC_OK
+        if buffer_channel not in include_channels:
+            return weechat.WEECHAT_RC_OK
 
     # Process all URLs from the message
     for url in url_re.findall(message):
@@ -111,40 +131,24 @@ def urlsave_print_cb(data, buffer, date, tags, displayed, highlight, prefix, mes
         if weechat.config_get_plugin("skip_duplicates") == "on":
             if is_url_listed(urlsave_buffer, url):
                 continue
-    
+
         #date_str = datetime.fromtimestamp(int(date)).strftime('%Y-%m-%d %H:%M:%S')
         # hash
         hashstr = os.urandom(8).encode('hex')
         output += "%s%s %s " % (weechat.color("reset"), hashstr, buffer_channel)
 
-        #if weechat.config_get_plugin("display_buffer_number") == "on":
-        #    output += "%-2d " % (weechat.buffer_get_integer(buffer, "number"))
-
-        #if weechat.config_get_plugin("display_nick") == "on":
-        #    output += "%s " % (prefix)
+        if weechat.config_get_plugin("display_nick") == "on":
+            output += "%s " % (prefix)
 
         # Output the formatted URL into the buffer
         weechat.prnt(urlsave_buffer, output + url)
 
-        # if pastebin
-        pastebin_re = re.compile(r'pastebin.com/(\w+)', re.I)
-        pastebin_m = pastebin_re.search(url)
-        if pastebin_m:
-            #weechat.prnt(urlsave_buffer, match.group(1))
-            url = "pastebin.com/raw.php?i=%s" % pastebin_m.group(1)
+        # post print actions
 
-        # if imgur
-        #http://imgur.com/download/40m3bjJ
-        #http://imgur.com/40m3bjJ
-        imgur_re = re.compile(r'imgur.com/(?:gallery/|)(\w+)', re.I)
-        imgur_m = imgur_re.search(url)
-        if imgur_m:
-            url = "imgur.com/download/%s" % imgur_m.group(1)
- 
-        # if youtube 
-        # TBD
+        # convert URL
+        convert_option = [ x for x in urlsave_settings.keys() if 'convert_' in x ]
 
-    
+        url = convert_url(url, convert_option)
 
         # run the hooked command
         hook_command = weechat.config_get_plugin("hook_command")
@@ -176,8 +180,7 @@ def urlsave_close_cb(data, buffer):
 
 
 if __name__ == "__main__" and import_ok:
-    if weechat.register(SCRIPT_NAME, SCRIPT_AUTHOR, SCRIPT_VERSION,
-                        SCRIPT_LICENSE, SCRIPT_DESC, "", ""):
+    if weechat.register(SCRIPT_NAME, SCRIPT_AUTHOR, SCRIPT_VERSION, SCRIPT_LICENSE, SCRIPT_DESC, "", ""):
         version = weechat.info_get('version_number', '') or 0
 
         # Set default settings
@@ -193,7 +196,7 @@ if __name__ == "__main__" and import_ok:
             # Create urlsave. Sets notify to 0 as this buffer does not need to
             # be in hotlist.
             urlsave_buffer = weechat.buffer_new("urlsave", "urlsave_input_cb", \
-                                               "", "urlsave_close_cb", "")
+                    "", "urlsave_close_cb", "")
             weechat.buffer_set(urlsave_buffer, "title", "URL buffer")
             weechat.buffer_set(urlsave_buffer, "notify", "0")
             weechat.buffer_set(urlsave_buffer, "nicklist", "0")
