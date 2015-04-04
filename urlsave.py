@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# This script is forked from urlsave, original developed by Jani Kesänen <jani.kesanen@gmail.com>
+# This script is forked from urlbuf, originally developed by Jani Kesänen <jani.kesanen@gmail.com>
 
 """
 urlsave
@@ -51,14 +51,15 @@ urlsave_buffer = None
 
 urlsave_settings = {
     "display_private"       : ("on",	"display URLs from private messages"),
-    "display_buffer_number" : ("on",	"display the buffer's number"),
     "display_nick"          : ("off",	"display the nick of the user"),
     "skip_duplicates"       : ("on",	"skip the URL that is already in the urlsave"),
-    "target_channels"       : ("",		"a comma separated list of channels to save URLs"),
+	"no_skips"				: ("on",	"display URLs from all buffers, override \'include_channels\'"),
+    "include_channels"      : ("",		"a comma separated list of channels to save URLs"),
     "hook_command"          : ("/usr/bin/curl %s -o %s --create-dirs",   "a hook command for grabbed URLs, the first %s is URL, the second is output file"),
     "save_folder"           : ("urls",	"folder to save the content of URLs"),
 	"convert_youtube"		: ("on",	"if convert youtube URL"),
 	"convert_imgur"			: ("on",	"if convert imgur URL"),
+	"convert_pastebin"		: ("on",	"if convert pastebin URL"),
 }
 
 def is_url_listed(buffer, url):
@@ -94,25 +95,17 @@ def urlsave_print_cb(data, buffer, date, tags, displayed, highlight, prefix, mes
         else:
            return weechat.WEECHAT_RC_OK
 
-    # Exit if the message came from a buffer that is on the skip list
-    buffer_number = str(weechat.buffer_get_integer(buffer, "number"))
-    skips = set(weechat.config_get_plugin("skip_buffers").split(","))
+    # Exit if the message came from a buffer that is not on the include channels
+    no_skips = weechat.config_get_plugin("include_channels")
+	if no_skips != "on":
+		buffer_channel = str(weechat.buffer_get_string(buffer, "name"))
+		include_channels = set(weechat.config_get_plugin("include_channels").split(","))
 
-    buffer_channel = str(weechat.buffer_get_string(buffer, "name"))
-    target_channels = set(weechat.config_get_plugin("target_channels").split(","))
-
-    if buffer_number in skips:
-        return weechat.WEECHAT_RC_OK
-
-    if buffer_channel not in target_channels:
-        return weechat.WEECHAT_RC_OK
-
-    if weechat.config_get_plugin("display_active_buffer") == "off":
-        if buffer_number == weechat.buffer_get_integer(weechat.current_buffer(), "number"):
-            return weechat.WEECHAT_RC_OK
+		if buffer_channel not in include_channels:
+			return weechat.WEECHAT_RC_OK
 
     # Process all URLs from the message
-    for url in urlRe.findall(message):
+    for url in url_re.findall(message):
         output = ""
 
         if weechat.config_get_plugin("skip_duplicates") == "on":
